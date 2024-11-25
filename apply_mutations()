@@ -1,0 +1,60 @@
+import os
+import subprocess
+import pytest
+
+def run_mutation_tests(original_file='Polynomial.py', test_file='PolyTest.py'):
+    # List of mutation functions from the previous script
+    mutation_functions = [
+        'mutate_arithmetic',
+        'mutate_coefficient', 
+        'mutate_loop_boundaries',
+        'add_redundant_code',
+        'mutate_conditions'
+    ]
+    
+    results = {}
+    
+    for mutate_func in mutation_functions:
+        # Create mutant
+        mutant_file = subprocess.check_output([
+            'python', '-c', 
+            f'from paste import {mutate_func}; {mutate_func}("Polynomial.py")'
+        ]).decode().strip().split(': ')[-1]
+        
+        # Run tests on mutant
+        try:
+            result = subprocess.run([
+                'pytest', test_file, 
+                f'--tb=no',  # Minimal traceback
+                f'--import-mode=importlib'  # Ensure correct module import
+            ], capture_output=True, text=True)
+            
+            # Determine if mutant was killed
+            killed = result.returncode != 0
+            
+            results[mutate_func] = {
+                'mutant_file': mutant_file,
+                'killed': killed,
+                'output': result.stdout
+            }
+        except Exception as e:
+            results[mutate_func] = {
+                'error': str(e)
+            }
+    
+    return results
+
+# Run the mutation tests
+if __name__ == '__main__':
+    mutation_results = run_mutation_tests()
+    
+    # Print results
+    print("Mutation Testing Results:")
+    for mutant, result in mutation_results.items():
+        print(f"\nMutant: {mutant}")
+        if 'error' in result:
+            print(f"Error: {result['error']}")
+        else:
+            print(f"Mutant File: {result['mutant_file']}")
+            print(f"Killed: {result['killed']}")
+            print(f"Test Output: {result['output']}")
